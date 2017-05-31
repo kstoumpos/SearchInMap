@@ -43,6 +43,7 @@ dependencies {
     compile 'com.couchbase.lite:couchbase-lite-android:0.0.0-679'
     compile 'com.google.android.gms:play-services:10.2.6'
     compile 'com.google.code.gson:gson:2.2.+'
+    compile 'com.google.android.gms:play-services-location:9.2.0'
 }
 
 

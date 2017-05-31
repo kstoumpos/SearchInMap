@@ -1,19 +1,27 @@
 package com.couchbase.grocerysync;
 
-import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.location.Criteria;
+import android.location.Location;
+import android.location.LocationManager;
 import android.os.Bundle;
+import android.support.annotation.NonNull;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.app.FragmentActivity;
+import android.support.v4.content.ContextCompat;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
-import android.widget.AdapterView;
-import android.widget.AdapterView.OnItemClickListener;
-import android.widget.AdapterView.OnItemLongClickListener;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.ListView;
 import android.widget.Toast;
+import android.support.v4.app.Fragment;
+import android.support.v4.app.FragmentActivity;
 
 import com.couchbase.lite.CouchbaseLiteException;
 import com.couchbase.lite.Database;
@@ -29,19 +37,41 @@ import com.couchbase.lite.QueryRow;
 import com.couchbase.lite.android.AndroidContext;
 import com.couchbase.lite.replicator.Replication;
 import com.couchbase.lite.util.Log;
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.PendingResult;
+import com.google.android.gms.common.api.ResultCallback;
+import com.google.android.gms.location.LocationListener;
+import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.location.places.PlaceLikelihood;
+import com.google.android.gms.location.places.PlaceLikelihoodBuffer;
+import com.google.android.gms.location.places.Places;
+import com.google.android.gms.maps.CameraUpdateFactory;
+import com.google.android.gms.maps.GoogleMap;
+import com.google.android.gms.maps.OnMapReadyCallback;
+import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.CameraPosition;
+import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.Marker;
+import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.gson.Gson;
 
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
-public class MainActivity extends Activity implements Replication.ChangeListener,
-        OnItemClickListener, OnItemLongClickListener{
+public class MapsActivity extends FragmentActivity implements Replication.ChangeListener, OnMapReadyCallback, LocationListener {
 
     public static String TAG = "POI";
+    private GoogleMap mMap;
+    private CameraPosition mCameraPosition;
+
+
+    // Keys for storing activity state.
+    private static final String KEY_CAMERA_POSITION = "camera_position";
+    private static final String KEY_LOCATION = "location";
 
     //constants
     public static final String DATABASE_NAME = "myapp";
@@ -52,9 +82,6 @@ public class MainActivity extends Activity implements Replication.ChangeListener
     // By default, use the sync gateway running on the Couchbase server.
     public static final String SYNC_URL = "http://81.171.24.208:4984/myapp/";
 
-    //main screen
-    protected EditText addItemEditText;
-    protected ListView itemListView;
     protected PoiArrayAdapter poiArrayAdapter;
 
     //couch internals
@@ -63,16 +90,17 @@ public class MainActivity extends Activity implements Replication.ChangeListener
     private LiveQuery liveQuery;
     String JSONString;
 
+    // Used for selecting the current place.
+    private final int mMaxEntries = 5;
+    private String[] mLikelyPlaceNames = new String[mMaxEntries];
+    private String[] mLikelyPlaceAddresses = new String[mMaxEntries];
+    private String[] mLikelyPlaceAttributions = new String[mMaxEntries];
+    private LatLng[] mLikelyPlaceLatLngs = new LatLng[mMaxEntries];
 
     public void onCreate(Bundle savedInstanceState) {
 
         super.onCreate(savedInstanceState);
-
         setContentView(R.layout.activity_main);
-
-        //connect items from layout
-        addItemEditText = (EditText)findViewById(R.id.addItemEditText);
-        itemListView = (ListView)findViewById(R.id.itemListView);
 
         try {
             startCBLite();
@@ -81,11 +109,13 @@ public class MainActivity extends Activity implements Replication.ChangeListener
             Log.e(TAG, "Error initializing CBLite", e);
         }
 
+        SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
+                .findFragmentById(R.id.map);
+        mapFragment.getMapAsync(this);
     }
 
-
     protected void onDestroy() {
-        if(manager != null) {
+        if (manager != null) {
             manager.close();
         }
         super.onDestroy();
@@ -137,8 +167,8 @@ public class MainActivity extends Activity implements Replication.ChangeListener
         query.setAllDocsMode(Query.AllDocsMode.ALL_DOCS);
         try {
             result = query.run();
-        }catch ( CouchbaseLiteException e) {
-            result=null;
+        } catch (CouchbaseLiteException e) {
+            result = null;
             Log.w("MYAPP", "errrrrrrrrrrrrrrrrrrrrrorrrrrrrrrrrrrrrr");
         }
         for (Iterator<QueryRow> it = result; it.hasNext(); ) {
@@ -184,7 +214,7 @@ public class MainActivity extends Activity implements Replication.ChangeListener
                     runOnUiThread(new Runnable() {
                         public void run() {
                             poiArrayAdapter.clear();
-                            for (Iterator<QueryRow> it = event.getRows(); it.hasNext();) {
+                            for (Iterator<QueryRow> it = event.getRows(); it.hasNext(); ) {
                                 poiArrayAdapter.add(it.next());
                             }
                             poiArrayAdapter.notifyDataSetChanged();
@@ -206,13 +236,10 @@ public class MainActivity extends Activity implements Replication.ChangeListener
                 R.id.label,
                 new ArrayList<QueryRow>()
         );
-        itemListView.setAdapter(poiArrayAdapter);
-        itemListView.setOnItemClickListener(MainActivity.this);
-        itemListView.setOnItemLongClickListener(MainActivity.this);
     }
 
 
-    private Poi parseDocPoi(Document d ) {
+    private Poi parseDocPoi(Document d) {
 
         Gson gson = new Gson();
         Map<String, Object> properties = d.getProperties();
@@ -228,79 +255,18 @@ public class MainActivity extends Activity implements Replication.ChangeListener
         //Double mLongitude = Double.parseDouble(Longitude);
         //Double mLatitude = 120.00;
 
-        Log.i(parseDocPoi + " title: ",""+ Title);
-        Log.i(parseDocPoi + " Category: ",""+ Category);
-        Log.i(parseDocPoi + " Longitude: ",""+ Longitude);
-        Log.i(parseDocPoi + " Latitude: ",""+ Latitude);
-        Log.i(parseDocPoi + " Order: ",""+ Order);
-        //Log.i(parseDocPoi + " mLatitude: ",""+ mLatitude.toString());
-        //Log.i(parseDocPoi + " mLongitude: ",""+ mLongitude.toString());
-
-
+        Log.i(parseDocPoi + " title: ", "" + Title);
+        Log.i(parseDocPoi + " Category: ", "" + Category);
+        Log.i(parseDocPoi + " Longitude: ", "" + Longitude);
+        Log.i(parseDocPoi + " Latitude: ", "" + Latitude);
+        Log.i(parseDocPoi + " Order: ", "" + Order);
 
         Poi mPoi = new Poi(Title, Latitude, Longitude, Category, Order);
         //String JSONString = gson.toJson(poiObj, Poi.class); //Convert the object to json string using Gson
         //Poi poi = (Poi) poiObj;
         gson.fromJson(JSONString, Poi.class); //convert the json string to Poi object
-        //Log.i(parseDocPoi + " - JSONString:", JSONString); //empty!!!
         Log.i(parseDocPoi + " getPoiFromDocument ", "jsonString>>>" + mPoi.getCategory()); //Marker Category
         return mPoi;
-    }
-
-    /**
-     * Handle click on item in list
-     */
-    public void onItemClick(AdapterView<?> adapterView, View view, int position, long id) {
-
-        QueryRow row = (QueryRow) adapterView.getItemAtPosition(position);
-        Document document = row.getDocument();
-        Map<String, Object> newProperties = new HashMap<String, Object>(document.getProperties());
-
-        boolean checked = ((Boolean) newProperties.get("check")).booleanValue();
-        newProperties.put("check", !checked);
-
-        try {
-            document.putProperties(newProperties);
-            poiArrayAdapter.notifyDataSetChanged();
-        } catch (Exception e) {
-            Toast.makeText(getApplicationContext(), "Error updating database, see logs for details", Toast.LENGTH_LONG).show();
-            Log.e(TAG, "Error updating database", e);
-        }
-
-    }
-
-    /**
-     * Handle long-click on item in list
-     */
-    public boolean onItemLongClick(AdapterView<?> adapterView, View view, int position, long id) {
-
-        QueryRow row = (QueryRow) adapterView.getItemAtPosition(position);
-        final Document clickedDocument = row.getDocument();
-        String itemText = (String) clickedDocument.getCurrentRevision().getProperty("text");
-
-        AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
-        AlertDialog alert = builder.setTitle("Delete Item?")
-                .setMessage("Are you sure you want to delete \"" + itemText + "\"?")
-                .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialog, int id) {
-                        try {
-                            clickedDocument.delete();
-                        } catch (Exception e) {
-                            Toast.makeText(getApplicationContext(), "Error deleting document, see logs for details", Toast.LENGTH_LONG).show();
-                            Log.e(TAG, "Error deleting document", e);
-                        }
-                    }
-                })
-                .setNegativeButton("No", new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialog, int id) {
-                        // Handle Cancel
-                    }
-                })
-                .create();
-
-        alert.show();
-
-        return true;
     }
 
     /**
@@ -331,8 +297,7 @@ public class MainActivity extends Activity implements Replication.ChangeListener
         if (!replication.isRunning()) {
             String msg = String.format("Replicator %s not running", replication);
             Log.d(TAG, msg);
-        }
-        else {
+        } else {
             int processed = replication.getCompletedChangesCount();
             int total = replication.getChangesCount();
             String msg = String.format("Replicator processed %d / %d", processed, total);
@@ -358,4 +323,69 @@ public class MainActivity extends Activity implements Replication.ChangeListener
 
     }
 
+    @Override
+    public void onLocationChanged(Location location) {
+        Double lat = (Double) (location.getLatitude());
+        Double lng = (Double) (location.getLongitude());
+    }
+
+
+    @Override
+    public void onMapReady(GoogleMap googleMap) {
+
+        mMap = googleMap;
+
+        mMap.setInfoWindowAdapter(new GoogleMap.InfoWindowAdapter() {
+
+                                      @Override
+                                      // Return null here, so that getInfoContents() is called next.
+                                      public View getInfoWindow(Marker arg0) {
+                                          return null;
+                                      }
+
+                                      @Override
+                                      public View getInfoContents(Marker marker) {
+                                          // Inflate the layouts for the info window, title and snippet.
+                                          View infoWindow = getLayoutInflater().inflate(R.layout.custom_info_contents,
+                                                  (FrameLayout)findViewById(R.id.map), false);
+
+//                                          TextView title = ((TextView) infoWindow.findViewById(R.id.title));
+//                                          title.setText(marker.getTitle());
+//
+//                                          TextView snippet = ((TextView) infoWindow.findViewById(R.id.snippet));
+//                                          snippet.setText(marker.getSnippet());
+
+                                          return infoWindow;
+                                      }
+                                  });
+
+        Query query = database.createAllDocumentsQuery();
+        QueryEnumerator result;
+
+        query.setAllDocsMode(Query.AllDocsMode.ALL_DOCS);
+        try {
+            result = query.run();
+        } catch (CouchbaseLiteException e) {
+            result = null;
+            Log.w("MYAPP", "errrrrrrrrrrrrrrrrrrrrrorrrrrrrrrrrrrrrr");
+        }
+        for (Iterator<QueryRow> it = result; it.hasNext(); ) {
+            QueryRow row = it.next();
+
+            Log.w("MYAPP", "Poi in document with id: %s", row.getDocumentId());
+            Document document = database.getDocument(row.getDocumentId());
+            String Title = (String) document.getProperties().get("title");
+            Double Latitude = (Double) document.getProperties().get("latitude");
+            Double Longitude = (Double) document.getProperties().get("longitude");
+            String Category = (String) document.getProperties().get("category");
+
+            LatLng marker = new LatLng(Latitude, Longitude);
+            mMap.addMarker(new MarkerOptions().position(marker).title(Title).snippet(Category));
+            //mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(lat, location.getLongitude()), 12.0f));
+            // Add a marker in Sydney, Australia, and move the camera.
+            //LatLng marker = new LatLng(-34, 151);
+
+            Log.i("Status: ", "End the App!");
+        }
+    }
 }
