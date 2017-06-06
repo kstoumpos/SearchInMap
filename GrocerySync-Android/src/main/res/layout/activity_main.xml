@@ -14,7 +14,18 @@
         android:orientation="horizontal"
         android:paddingLeft="48dp"
         android:paddingRight="48dp">
-
     </LinearLayout>
+
+    <EditText
+        android:id="@+id/marker_search"
+        android:layout_width="295dp"
+        android:layout_height="38dp"
+        android:gravity="center_vertical"
+        android:layout_marginTop="12dp"
+        android:layout_marginLeft="15dp"
+        android:hint="  Search Location"
+        android:textColor="@android:color/black"
+        android:background="@android:color/white" >
+    </EditText>
 
 </fragment>
