@@ -35,7 +35,6 @@
             android:value="AIzaSyDid06qOEsPogdEmg5LsbAchnSr9-wQHrE" />
 
         <activity android:name=".PoiSyncPreferencesActivity" />
-        <activity android:name=".GoogleMapActivity"></activity>
     </application>
 
 </manifest>
