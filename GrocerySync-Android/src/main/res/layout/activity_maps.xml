@@ -11,11 +11,22 @@
         android:weightSum="1">
 
 
-        <EditText
-            android:id="@+id/TFaddress"
-            android:layout_width="183dp"
+        <!--<EditText-->
+            <!--android:id="@+id/TFaddress"-->
+            <!--android:layout_width="183dp"-->
+            <!--android:layout_height="wrap_content"-->
+            <!--android:layout_weight="1.06" />-->
+
+        <AutoCompleteTextView
+            android:id="@+id/autoCompleteTextView"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1.06" />
+            android:ems="10"
+            android:layout_weight="1.06"
+            android:text="Please enter your place" >
+            <requestFocus />
+        </AutoCompleteTextView>
+
 
         <Button
             android:id="@+id/Bsearch"
