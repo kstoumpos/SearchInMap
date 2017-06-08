@@ -11,10 +11,7 @@ import android.os.Bundle;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
 import android.view.View;
-import android.widget.ArrayAdapter;
 import android.widget.EditText;
-import android.widget.ImageButton;
-import android.widget.ListView;
 import android.widget.Toast;
 
 import com.couchbase.lite.CouchbaseLiteException;
@@ -50,6 +47,7 @@ import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.gson.Gson;
 
+import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.text.DateFormat;
@@ -58,7 +56,6 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 import com.google.android.gms.common.api.GoogleApiClient.ConnectionCallbacks;
@@ -88,25 +85,12 @@ public class MapsActivity extends FragmentActivity implements Replication.Change
     protected final static String KEY_REQUESTING_LOCATION_UPDATES = "requesting-location-updates";
     protected final static String KEY_LAST_UPDATED_TIME_STRING = "last-updated-time-string";
 
-    /**
-     * Provides the entry point to Google Play services.
-     */
     protected GoogleApiClient mGoogleApiClient;
 
-    /**
-     * Stores parameters for requests to the FusedLocationProviderApi.
-     */
     protected LocationRequest mLocationRequest;
 
-    /**
-     * Stores the types of location services the client is interested in using. Used for checking
-     * settings to determine if the device has optimal location settings.
-     */
     protected LocationSettingsRequest mLocationSettingsRequest;
 
-    /**
-     * Represents a geographical location.
-     */
     protected Location mCurrentLocation;
     protected Location mLastLocation;
 
@@ -134,19 +118,8 @@ public class MapsActivity extends FragmentActivity implements Replication.Change
     private LiveQuery liveQuery;
     String JSONString;
 
-    // Search EditText
-    EditText search;
-    String searchText;
-    ImageButton searchButton;
-
-    // List view
-    private ListView lv;
-    // Listview Adapter
-    ArrayAdapter<String> adapter;
 
     private HashMap<String, Marker> markers = new HashMap<String,Marker>();
-
-    ArrayList markerList;
 
     /**
      * Tracks the status of the location updates request. Value changes when the user presses the
@@ -162,11 +135,7 @@ public class MapsActivity extends FragmentActivity implements Replication.Change
     public void onCreate(Bundle savedInstanceState) {
 
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
-
-        EditText search = (EditText) findViewById(R.id.marker_search);
-        String searchText = search.getText().toString();
-        Log.i("SearchText = ", ""+searchText);
+        setContentView(R.layout.activity_maps);
 
         try {
             startCBLite();
@@ -186,26 +155,7 @@ public class MapsActivity extends FragmentActivity implements Replication.Change
         buildGoogleApiClient();
         createLocationRequest();
         buildLocationSettingsRequest();
-        SearchOnButton();
-
-        SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
-                .findFragmentById(R.id.map);
-        mapFragment.getMapAsync(this);
-    }
-
-    public void SearchOnButton() {
-
-        searchButton = (ImageButton) findViewById(R.id.search_button);
-
-        searchButton.setOnClickListener(new View.OnClickListener() {
-
-            @Override
-            public void onClick(View arg0) {
-                Toast.makeText(MapsActivity.this,
-                        "Search button clicked", Toast.LENGTH_SHORT).show();
-                //if edittext == address then another activity?
-            }
-        });
+        setUpMapIfNeeded();
     }
 
     protected void onDestroy() {
@@ -475,26 +425,6 @@ public class MapsActivity extends FragmentActivity implements Replication.Change
         mLocationSettingsRequest = builder.build();
     }
 
-//    @Override
-//    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-//        switch (requestCode) {
-//            // Check for the integer request code originally supplied to startResolutionForResult().
-//            case REQUEST_CHECK_SETTINGS:
-//                switch (resultCode) {
-//                    case Activity.RESULT_OK:
-//                        Log.i(TAG, "User agreed to make required location settings changes.");
-//                        // Nothing to do. startLocationupdates() gets called in onResume again.
-//                        break;
-//                    case Activity.RESULT_CANCELED:
-//                        Log.i(TAG, "User chose not to make required location settings changes.");
-//                        mRequestingLocationUpdates = false;
-//                        updateUI();
-//                        break;
-//                }
-//                break;
-//        }
-//    }
-
     /**
      * Requests location updates from the FusedLocationApi.
      */
@@ -703,7 +633,7 @@ public class MapsActivity extends FragmentActivity implements Replication.Change
     public void onMapReady(GoogleMap googleMap) {
 
         mMap = googleMap;
-        // mMap is a GoogleMap object
+        mMap.setMyLocationEnabled(true);
 
         //list of markers
         List<Marker> list = new ArrayList<>();
@@ -718,7 +648,6 @@ public class MapsActivity extends FragmentActivity implements Replication.Change
             // for ActivityCompat#requestPermissions for more details.
             return;
         }
-        googleMap.setMyLocationEnabled(true);
         LocationManager locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
         Criteria criteria = new Criteria();
         String provider = locationManager.getBestProvider(criteria, true);
@@ -755,8 +684,6 @@ public class MapsActivity extends FragmentActivity implements Replication.Change
             LatLng marker = new LatLng(Latitude, Longitude);
             mMap.addMarker(new MarkerOptions().position(marker).title(Title).snippet(Category));
 
-            getCompleteAddressString(Latitude,Longitude); //return the address
-
             //...
             Marker markerToList = mMap.addMarker(new MarkerOptions()
                     .position(marker)
@@ -764,41 +691,51 @@ public class MapsActivity extends FragmentActivity implements Replication.Change
                     .snippet(Category));
             markers.put("Name1", markerToList);
             //add more and more markers
-
-//            Marker Map_marker = mMap.addMarker(new MarkerOptions()
-//                    .position(marker)
-//                    .title(Title)
-//                    .snippet(Category));
-//            list.add(Map_marker); //add markers to list
         }
         Log.i("Marker's list: ", ""+list.toString());
         Log.i("Status: ","End the App!");
     }
 
-    private String getCompleteAddressString(double LATITUDE, double LONGITUDE) {
-        String strAdd = "";
-        List<String> AddressList = new ArrayList<>();
-
-
-        Geocoder geocoder = new Geocoder(this, Locale.getDefault());
-        try {
-            List<Address> addresses = geocoder.getFromLocation(LATITUDE, LONGITUDE, 1);
-            if (addresses != null) {
-                Address returnedAddress = addresses.get(0);
-                StringBuilder strReturnedAddress = new StringBuilder("");
-
-                for (int i = 0; i < returnedAddress.getMaxAddressLineIndex(); i++) {
-                    strReturnedAddress.append(returnedAddress.getAddressLine(i)).append("\n");
-                }
-                strAdd = strReturnedAddress.toString();
-                Log.w("My Current location address", "" + strReturnedAddress.toString());
-            } else {
-                Log.w("My Current location address", "No Address returned!");
+    private void setUpMapIfNeeded() {
+        // Do a null check to confirm that we have not already instantiated the map.
+        if (mMap == null) {
+            // Try to obtain the map from the SupportMapFragment.
+            SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
+                    .findFragmentById(R.id.map);
+            mapFragment.getMapAsync(this);
+            // Check if we were successful in obtaining the map.
+            if (mMap != null) {
+                setUpMap();
             }
-        } catch (Exception e) {
-            e.printStackTrace();
-            Log.w("My Current location address", "Cannot get Address!");
         }
-        return strAdd;
+    }
+
+    private void setUpMap() {
+        mMap.addMarker(new MarkerOptions().position(new LatLng(0, 0)).title("Marker"));
+        mMap.setMyLocationEnabled(true);
+    }
+
+    public void onSearch(View view)
+    {
+        EditText location_tf = (EditText)findViewById(R.id.TFaddress);
+        String location = location_tf.getText().toString();
+        List<Address> addressList = null;
+        if(location != null || !location.equals(""))
+        {
+            Geocoder geocoder = new Geocoder(this);
+            try {
+                addressList = geocoder.getFromLocationName(location , 1);
+
+
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            Address address = addressList.get(0);
+            LatLng latLng = new LatLng(address.getLatitude() , address.getLongitude());
+            mMap.addMarker(new MarkerOptions().position(latLng).title("Marker"));
+            mMap.animateCamera(CameraUpdateFactory.newLatLng(latLng));
+
+        }
     }
 }
