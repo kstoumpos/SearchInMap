@@ -79,13 +79,13 @@ import android.widget.AdapterView.OnItemClickListener;
 public class MapsActivity extends FragmentActivity implements Replication.ChangeListener, OnItemClickListener, OnMapReadyCallback, ConnectionCallbacks,
         OnConnectionFailedListener,
         LocationListener {
-    private static final String LOG_TAG = "ExampleApp";
+    private static final String LOG_TAG = "MyApp";
 
     private static final String PLACES_API_BASE = "https://maps.googleapis.com/maps/api/place";
     private static final String TYPE_AUTOCOMPLETE = "/autocomplete";
     private static final String OUT_JSON = "/json";
 
-    //------------ make your specific key ------------
+    //------------ Google places autocomplete API key ------------
     private static final String API_KEY = "AIzaSyDN5TthFUkBabAm0WAzxx4AKkxalQOL0ew";
     /**
      * Constant used in the location settings dialog.
