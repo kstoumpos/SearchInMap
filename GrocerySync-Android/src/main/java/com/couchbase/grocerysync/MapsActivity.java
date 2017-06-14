@@ -1,5 +1,6 @@
 package com.couchbase.grocerysync;
 
+import android.Manifest;
 import android.content.Context;
 import android.content.IntentSender;
 import android.content.pm.PackageManager;
@@ -12,12 +13,15 @@ import android.os.Bundle;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Filter;
 import android.widget.Filterable;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.couchbase.lite.CouchbaseLiteException;
@@ -80,6 +84,12 @@ public class MapsActivity extends FragmentActivity implements Replication.Change
         OnConnectionFailedListener,
         LocationListener {
     private static final String LOG_TAG = "MyApp";
+
+    private ViewGroup infoWindow;
+    private TextView infoTitle;
+    private TextView infoSnippet;
+    private Button infoButton;
+    private OnInfoWindowElemTouchListener infoButtonListener;
 
     private static final String PLACES_API_BASE = "https://maps.googleapis.com/maps/api/place";
     private static final String TYPE_AUTOCOMPLETE = "/autocomplete";
@@ -657,19 +667,15 @@ public class MapsActivity extends FragmentActivity implements Replication.Change
 
         mMap = googleMap;
         mMap.setMyLocationEnabled(true);
+        mMap.setTrafficEnabled(true);
+        mMap.setIndoorEnabled(true);
+        mMap.setBuildingsEnabled(true);
+        mMap.getUiSettings().setZoomControlsEnabled(true);
 
         //list of markers
         List<Marker> list = new ArrayList<>();
 
-        if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            // TODO: Consider calling
-            //    ActivityCompat#requestPermissions
-            // here to request the missing permissions, and then overriding
-            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-            //                                          int[] grantResults)
-            // to handle the case where the user grants the permission. See the documentation
-            // for ActivityCompat#requestPermissions for more details.
-            return;
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
         }
         LocationManager locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
         Criteria criteria = new Criteria();
@@ -714,6 +720,57 @@ public class MapsActivity extends FragmentActivity implements Replication.Change
                     .snippet(Category));
             markers.put("Name1", markerToList);
             //add more and more markers
+
+            //final MapFragment mapFragment = (MapFragment)getFragmentManager().findFragmentById(R.id.map);
+            final MapWrapperLayout mapWrapperLayout = (MapWrapperLayout)findViewById(R.id.map_relative_layout);
+            //final GoogleMap map = mapFragment.getMap();
+
+            // MapWrapperLayout initialization
+            // 39 - default marker height
+            // 20 - offset between the default InfoWindow bottom edge and it's content bottom edge
+            mapWrapperLayout.init(mMap, getPixelsFromDp(this, 39 + 20));
+
+            // We want to reuse the info window for all the markers,
+            // so let's create only one class member instance
+            this.infoWindow = (ViewGroup)getLayoutInflater().inflate(R.layout.info_widow_layout, null);
+            this.infoTitle = (TextView)infoWindow.findViewById(R.id.nametv);
+            this.infoSnippet = (TextView)infoWindow.findViewById(R.id.addressTv);
+            this.infoButton = (Button)infoWindow.findViewById(R.id.clinicType);
+
+            // Setting custom OnTouchListener which deals with the pressed state
+            // so it shows up
+            this.infoButtonListener = new OnInfoWindowElemTouchListener(infoButton,
+                    getResources().getDrawable(R.drawable.round_but_green_sel), //btn_default_normal_holo_light
+                    getResources().getDrawable(R.drawable.round_but_red_sel)) //btn_default_pressed_holo_light
+            {
+                @Override
+                protected void onClickConfirmed(View v, Marker marker) {
+                    // Here we can perform some action triggered after clicking the button
+                    Toast.makeText(MapsActivity.this, marker.getTitle() + "'s button clicked!", Toast.LENGTH_SHORT).show();
+                }
+            };
+            this.infoButton.setOnTouchListener(infoButtonListener);
+
+
+            mMap.setInfoWindowAdapter(new GoogleMap.InfoWindowAdapter() {
+                @Override
+                public View getInfoWindow(Marker marker) {
+                    return null;
+                }
+
+                @Override
+                public View getInfoContents(Marker marker) {
+                    // Setting up the infoWindow with current's marker info
+                    infoTitle.setText(marker.getTitle());
+                    infoSnippet.setText(marker.getSnippet());
+                    infoButtonListener.setMarker(marker);
+
+                    // We must call this to set the current marker and infoWindow references
+                    // to the MapWrapperLayout
+                    mapWrapperLayout.setMarkerWithInfoWindow(marker, infoWindow);
+                    return infoWindow;
+                }
+            });
         }
         Log.i("Marker's list: ", ""+list.toString());
         Log.i("Status: ","End the App!");
@@ -870,5 +927,10 @@ public class MapsActivity extends FragmentActivity implements Replication.Change
             };
             return filter;
         }
+    }
+
+    public static int getPixelsFromDp(Context context, float dp) {
+        final float scale = context.getResources().getDisplayMetrics().density;
+        return (int)(dp * scale + 0.5f);
     }
 }
