@@ -1,0 +1,62 @@
+<LinearLayout xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:weightSum="1">
+
+
+        <!--<EditText-->
+            <!--android:id="@+id/TFaddress"-->
+            <!--android:layout_width="183dp"-->
+            <!--android:layout_height="wrap_content"-->
+            <!--android:layout_weight="1.06" />-->
+
+        <AutoCompleteTextView
+            android:id="@+id/autoCompleteTextView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ems="10"
+            android:layout_weight="1.06"
+            android:text="Please enter your place" >
+            <requestFocus />
+        </AutoCompleteTextView>
+
+
+        <ImageButton
+            android:id="@+id/Bsearch"
+            style="?android:attr/buttonStyleSmall"
+            android:src="@drawable/g_search_btn"
+            android:layout_width="90dp"
+            android:layout_height="wrap_content"
+            android:layout_gravity="right"
+            android:onClick="onSearch" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent">
+
+        <com.couchbase.grocerysync.MapWrapperLayout
+            xmlns:android="http://schemas.android.com/apk/res/android"
+            android:id="@+id/map_relative_layout"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            >
+
+            <fragment
+                android:id="@+id/map"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                class="com.google.android.gms.maps.MapFragment" />
+
+        </com.couchbase.grocerysync.MapWrapperLayout>
+
+    </LinearLayout>
+
+</LinearLayout>

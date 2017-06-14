@@ -1,0 +1,443 @@
+Index: GrocerySync-Android/src/main/res/layout/grocery_list_item.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- GrocerySync-Android/src/main/res/layout/grocery_list_item.xml	(revision bf96f7767762580fc40836dacc3cdddfdbf08a2d)
++++ GrocerySync-Android/src/main/res/layout/grocery_list_item.xml	(revision )
+@@ -11,8 +11,8 @@
+ 		<TextView android:text="@+id/TextView01" android:layout_width="fill_parent"
+ 		android:layout_height="fill_parent" android:id="@+id/label"
+ 		android:layout_marginLeft="10px"
+-		android:textSize="40px" android:gravity="center_vertical" android:textColor="#808080" android:singleLine="true"
+-		></TextView>
++		android:textSize="40px" android:gravity="center_vertical" android:textColor="#808080" android:singleLine="true">
++		</TextView>
+ 	</LinearLayout>
+ 
+ </LinearLayout>
+Index: GrocerySync-Android/src/main/AndroidManifest.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- GrocerySync-Android/src/main/AndroidManifest.xml	(revision bf96f7767762580fc40836dacc3cdddfdbf08a2d)
++++ GrocerySync-Android/src/main/AndroidManifest.xml	(revision )
+@@ -35,7 +35,6 @@
+             android:value="AIzaSyDid06qOEsPogdEmg5LsbAchnSr9-wQHrE" />
+ 
+         <activity android:name=".PoiSyncPreferencesActivity" />
+-        <activity android:name=".GoogleMapActivity"></activity>
+     </application>
+ 
+ </manifest>
+\ No newline at end of file
+Index: GrocerySync-Android/src/main/res/layout/activity_main.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- GrocerySync-Android/src/main/res/layout/activity_main.xml	(revision bf96f7767762580fc40836dacc3cdddfdbf08a2d)
++++ GrocerySync-Android/src/main/res/layout/activity_main.xml	(revision )
+@@ -28,4 +28,16 @@
+         android:background="@android:color/white" >
+     </EditText>
+ 
++    <ImageButton
++        android:id="@+id/search_button"
++        android:src="@drawable/g_search_btn"
++        android:tileMode="disabled"
++        android:background="@null"
++        android:scaleType="fitCenter"
++        android:layout_marginLeft="275dp"
++        android:layout_width="38dp"
++        android:layout_height="38dp"
++        android:layout_marginTop="12dp">
++        </ImageButton>
++
+ </fragment>
+\ No newline at end of file
+Index: GrocerySync-Android/src/main/java/com/couchbase/grocerysync/MapsActivity.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- GrocerySync-Android/src/main/java/com/couchbase/grocerysync/MapsActivity.java	(revision bf96f7767762580fc40836dacc3cdddfdbf08a2d)
++++ GrocerySync-Android/src/main/java/com/couchbase/grocerysync/MapsActivity.java	(revision )
+@@ -1,20 +1,19 @@
+ package com.couchbase.grocerysync;
+ 
+-import android.app.Activity;
+-import android.content.Intent;
+ import android.content.IntentSender;
+ import android.content.pm.PackageManager;
++import android.location.Address;
+ import android.location.Criteria;
++import android.location.Geocoder;
+ import android.location.Location;
+ import android.location.LocationManager;
+ import android.os.Bundle;
+ import android.support.v4.app.ActivityCompat;
+ import android.support.v4.app.FragmentActivity;
+-import android.text.Editable;
+-import android.text.TextWatcher;
+ import android.view.View;
+ import android.widget.ArrayAdapter;
+ import android.widget.EditText;
++import android.widget.ImageButton;
+ import android.widget.ListView;
+ import android.widget.Toast;
+ 
+@@ -33,8 +32,6 @@
+ import com.couchbase.lite.replicator.Replication;
+ import com.couchbase.lite.util.Log;
+ import com.google.android.gms.common.ConnectionResult;
+-import com.google.android.gms.common.GooglePlayServicesNotAvailableException;
+-import com.google.android.gms.common.GooglePlayServicesRepairableException;
+ import com.google.android.gms.common.api.GoogleApiClient;
+ import com.google.android.gms.common.api.ResultCallback;
+ import com.google.android.gms.common.api.Status;
+@@ -44,9 +41,6 @@
+ import com.google.android.gms.location.LocationSettingsRequest;
+ import com.google.android.gms.location.LocationSettingsResult;
+ import com.google.android.gms.location.LocationSettingsStatusCodes;
+-import com.google.android.gms.location.places.Place;
+-import com.google.android.gms.location.places.ui.PlaceAutocomplete;
+-import com.google.android.gms.maps.CameraUpdate;
+ import com.google.android.gms.maps.CameraUpdateFactory;
+ import com.google.android.gms.maps.GoogleMap;
+ import com.google.android.gms.maps.OnMapReadyCallback;
+@@ -64,13 +58,12 @@
+ import java.util.HashMap;
+ import java.util.Iterator;
+ import java.util.List;
++import java.util.Locale;
+ import java.util.Map;
+ 
+ import com.google.android.gms.common.api.GoogleApiClient.ConnectionCallbacks;
+ import com.google.android.gms.common.api.GoogleApiClient.OnConnectionFailedListener;
+ 
+-import static android.R.id.list;
+-
+ public class MapsActivity extends FragmentActivity implements Replication.ChangeListener, OnMapReadyCallback, ConnectionCallbacks,
+         OnConnectionFailedListener,
+         LocationListener {
+@@ -122,12 +115,11 @@
+     private GoogleMap mMap;
+ 
+     // Keys for storing activity state.
+-    private static final String KEY_CAMERA_POSITION = "camera_position";
+     private static final String KEY_LOCATION = "location";
+ 
+     //constants
+     public static final String DATABASE_NAME = "myapp";
+-    public static final String designDocName = "grocery-local";
++    public static final String designDocName = "myapp-local";
+     public static final String byDateViewName = "byDate";
+     public static final String parseDocPoi = "PARSE_DOC_POI";
+ 
+@@ -144,13 +136,18 @@
+ 
+     // Search EditText
+     EditText search;
++    String searchText;
++    ImageButton searchButton;
++
+     // List view
+     private ListView lv;
+     // Listview Adapter
+     ArrayAdapter<String> adapter;
+-    // ArrayList for Listview
+-    ArrayList<HashMap<String, String>> MarkerList;
+ 
++    private HashMap<String, Marker> markers = new HashMap<String,Marker>();
++
++    ArrayList markerList;
++
+     /**
+      * Tracks the status of the location updates request. Value changes when the user presses the
+      * Start Updates and Stop Updates buttons.
+@@ -168,6 +165,8 @@
+         setContentView(R.layout.activity_main);
+ 
+         EditText search = (EditText) findViewById(R.id.marker_search);
++        String searchText = search.getText().toString();
++        Log.i("SearchText = ", ""+searchText);
+ 
+         try {
+             startCBLite();
+@@ -187,12 +186,28 @@
+         buildGoogleApiClient();
+         createLocationRequest();
+         buildLocationSettingsRequest();
++        SearchOnButton();
+ 
+         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
+                 .findFragmentById(R.id.map);
+         mapFragment.getMapAsync(this);
+     }
+ 
++    public void SearchOnButton() {
++
++        searchButton = (ImageButton) findViewById(R.id.search_button);
++
++        searchButton.setOnClickListener(new View.OnClickListener() {
++
++            @Override
++            public void onClick(View arg0) {
++                Toast.makeText(MapsActivity.this,
++                        "Search button clicked", Toast.LENGTH_SHORT).show();
++                //if edittext == address then another activity?
++            }
++        });
++    }
++
+     protected void onDestroy() {
+         if (manager != null) {
+             manager.close();
+@@ -248,12 +263,12 @@
+             result = query.run();
+         } catch (CouchbaseLiteException e) {
+             result = null;
+-            Log.w("MYAPP", "errrrrrrrrrrrrrrrrrrrrrorrrrrrrrrrrrrrrr");
++            Log.w("MY_APP", "error error in couchbase");
+         }
+         for (Iterator<QueryRow> it = result; it.hasNext(); ) {
+             QueryRow row = it.next();
+ 
+-            Log.w("MYAPP", "Poi in document with id: %s", row.getDocumentId());
++            Log.w("MY_APP", "Poi in document with id: %s", row.getDocumentId());
+             Document document = database.getDocument(row.getDocumentId());
+             parseDocPoi(document);
+         }
+@@ -640,6 +655,23 @@
+      */
+     @Override
+     public void onLocationChanged(Location location) {
++
++        // Getting latitude of the current location
++        double latitude = location.getLatitude();
++
++        // Getting longitude of the current location
++        double longitude = location.getLongitude();
++
++        // Creating a LatLng object for the current location
++        LatLng latLng = new LatLng(latitude, longitude);
++
++        // Showing the current location in Google Map
++        mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng));
++
++        // Zoom in the Google Map
++        //mMap.animateCamera(CameraUpdateFactory.zoomTo(15));
++        mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(location.getLatitude(), location.getLongitude()), 12.0f));
++
+         mCurrentLocation = location;
+         mLastUpdateTime = DateFormat.getTimeInstance().format(new Date());
+         updateLocationUI();
+@@ -674,7 +706,7 @@
+         // mMap is a GoogleMap object
+ 
+         //list of markers
+-        List<Marker> markerList = new ArrayList<Marker>();
++        List<Marker> list = new ArrayList<>();
+ 
+         if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+             // TODO: Consider calling
+@@ -693,17 +725,8 @@
+         Location location = locationManager.getLastKnownLocation(provider);
+ 
+         if (location != null) {
+-            double latitude = location.getLatitude();
+-            double longitude = location.getLongitude();
+-            Log.i("myLatitude is ", "" + latitude);
+-            Log.i("myLongitude is ", "" + longitude);
+-
+-            LatLng coordinate = new LatLng(latitude, longitude);
+-            CameraUpdate yourLocation = CameraUpdateFactory.newLatLngZoom(coordinate, 119);
+-            mMap.animateCamera(yourLocation);
+-            mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(coordinate, 15));
+-            // Zoom in, animating the camera.
+-            mMap.animateCamera(CameraUpdateFactory.zoomTo(14), 2000, null);
++            onLocationChanged(location);
++            mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(location.getLatitude(), location.getLongitude()), 12.0f));
+         }
+ 
+         Query query = database.createAllDocumentsQuery();
+@@ -714,12 +737,12 @@
+             result = query.run();
+         } catch (CouchbaseLiteException e) {
+             result = null;
+-            Log.w("MYAPP", "errrrrrrrrrrrrrrrrrrrrrorrrrrrrrrrrrrrrr");
++            Log.w("MY_APP", "error error!!!");
+         }
+         for (Iterator<QueryRow> it = result; it.hasNext(); ) {
+             QueryRow row = it.next();
+ 
+-            Log.w("MYAPP", "Poi in document with id: %s", row.getDocumentId());
++            Log.w("MY_APP", "Poi in document with id: %s", row.getDocumentId());
+             Document document = database.getDocument(row.getDocumentId());
+             String Title = (String) document.getProperties().get("title");
+             Double Latitude = (Double) document.getProperties().get("latitude");
+@@ -732,73 +755,50 @@
+             LatLng marker = new LatLng(Latitude, Longitude);
+             mMap.addMarker(new MarkerOptions().position(marker).title(Title).snippet(Category));
+ 
+-            Marker Map_marker = mMap.addMarker(new MarkerOptions()
++            getCompleteAddressString(Latitude,Longitude); //return the address
++
++            //...
++            Marker markerToList = mMap.addMarker(new MarkerOptions()
+                     .position(marker)
+                     .title(Title)
+                     .snippet(Category));
+-            markerList.add(Map_marker);
++            markers.put("Name1", markerToList);
++            //add more and more markers
+ 
+-            Log.i("list",markerList.toString());
++//            Marker Map_marker = mMap.addMarker(new MarkerOptions()
++//                    .position(marker)
++//                    .title(Title)
++//                    .snippet(Category));
++//            list.add(Map_marker); //add markers to list
++        }
++        Log.i("Marker's list: ", ""+list.toString());
+-            Log.i("Status: ","End the App!");
+-        }
++        Log.i("Status: ","End the App!");
++    }
+-    }
+ 
+-    public void findPlace(View view) {
+-        try {
+-            Intent intent =
+-                    new PlaceAutocomplete.IntentBuilder(PlaceAutocomplete.MODE_FULLSCREEN)
+-                            .build(this);
+-            startActivityForResult(intent, 1);
+-        } catch (GooglePlayServicesRepairableException e) {
+-            // TODO: Handle the error.
+-        } catch (GooglePlayServicesNotAvailableException e) {
+-            // TODO: Handle the error.
+-        }
+-    }
++    private String getCompleteAddressString(double LATITUDE, double LONGITUDE) {
++        String strAdd = "";
++        List<String> AddressList = new ArrayList<>();
+ 
+-    // A place has been received; use requestCode to track the request.
+-    @Override
+-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+-        switch (requestCode) {
+-            // Check for the integer request code originally supplied to startResolutionForResult().
+-            case REQUEST_CHECK_SETTINGS:
+-                switch (resultCode) {
+-                    case Activity.RESULT_OK:
+-                        Log.i(TAG, "User agreed to make required location settings changes.");
+-                        // Nothing to do. startLocationupdates() gets called in onResume again.
+-                        break;
+-                    case Activity.RESULT_CANCELED:
+-                        Log.i(TAG, "User chose not to make required location settings changes.");
+-                        mRequestingLocationUpdates = false;
+-                        updateUI();
+-                        break;
+-                }
+-                break;
+-        }
+-        if (requestCode == 1) {
+-            if (resultCode == RESULT_OK) {
+-                Place place = PlaceAutocomplete.getPlace(this, data);
+-                android.util.Log.e("Tag", "Place: " + place.getAddress() + place.getPhoneNumber() + place.getLatLng().latitude);
+ 
+-                Intent intent = new Intent(MapsActivity.this, GoogleMapActivity.class);
+-                intent.putExtra("latitude", place.getLatLng().latitude);
+-                intent.putExtra("longitute", place.getLatLng().longitude);
+-                intent.putExtra("name", place.getName());
+-                intent.putExtra("address", place.getAddress());
+-                startActivity(intent);
++        Geocoder geocoder = new Geocoder(this, Locale.getDefault());
++        try {
++            List<Address> addresses = geocoder.getFromLocation(LATITUDE, LONGITUDE, 1);
++            if (addresses != null) {
++                Address returnedAddress = addresses.get(0);
++                StringBuilder strReturnedAddress = new StringBuilder("");
+ 
+-
+-//                        ((TextView) findViewById(R.id.searched_address)).setText(place.getName() + ",\n" +
+-//                        place.getAddress() + "\n" + place.getPhoneNumber());
+-
+-            } else if (resultCode == PlaceAutocomplete.RESULT_ERROR) {
+-                Status status = PlaceAutocomplete.getStatus(this, data);
+-                // TODO: Handle the error.
+-                android.util.Log.e("Tag", status.getStatusMessage());
+-
+-            } else if (resultCode == RESULT_CANCELED) {
+-                // The user canceled the operation.
++                for (int i = 0; i < returnedAddress.getMaxAddressLineIndex(); i++) {
++                    strReturnedAddress.append(returnedAddress.getAddressLine(i)).append("\n");
+-            }
++                }
++                strAdd = strReturnedAddress.toString();
++                Log.w("My Current location address", "" + strReturnedAddress.toString());
++            } else {
++                Log.w("My Current location address", "No Address returned!");
+-        }
++            }
++        } catch (Exception e) {
++            e.printStackTrace();
++            Log.w("My Current location address", "Cannot get Address!");
++        }
++        return strAdd;
+     }
+ }
+Index: GrocerySync-Android/src/main/java/com/couchbase/grocerysync/GoogleMapActivity.java
+===================================================================
+--- GrocerySync-Android/src/main/java/com/couchbase/grocerysync/GoogleMapActivity.java	(revision bf96f7767762580fc40836dacc3cdddfdbf08a2d)
++++ GrocerySync-Android/src/main/java/com/couchbase/grocerysync/GoogleMapActivity.java	(revision bf96f7767762580fc40836dacc3cdddfdbf08a2d)
+@@ -1,47 +0,0 @@
+-package com.couchbase.grocerysync;
+-
+-import android.content.Intent;
+-import android.support.v7.app.AppCompatActivity;
+-import android.os.Bundle;
+-
+-import com.google.android.gms.maps.CameraUpdateFactory;
+-import com.google.android.gms.maps.GoogleMap;
+-import com.google.android.gms.maps.OnMapReadyCallback;
+-import com.google.android.gms.maps.SupportMapFragment;
+-import com.google.android.gms.maps.model.LatLng;
+-import com.google.android.gms.maps.model.MarkerOptions;
+-
+-
+-public class GoogleMapActivity extends AppCompatActivity implements OnMapReadyCallback {
+-    String title, address;
+-    double latitude,longitude;
+-
+-    @Override
+-    protected void onCreate(Bundle savedInstanceState) {
+-        super.onCreate(savedInstanceState);
+-        setContentView(R.layout.activity_google_map);
+-
+-        Intent intent = getIntent();
+-        latitude = intent.getDoubleExtra("latitude", 0d);
+-        longitude = intent.getDoubleExtra("longitute",0d);
+-        title = intent.getStringExtra("name");
+-        address = intent.getStringExtra("address");
+-
+-
+-        //Log.e("place",latlngss);
+-
+-        SupportMapFragment mapFragment = (SupportMapFragment)getSupportFragmentManager().findFragmentById(R.id.map);
+-        mapFragment.getMapAsync(this);
+-    }
+-
+-    public void onMapReady(GoogleMap map){
+-        LatLng sydney = new LatLng(latitude,longitude);
+-
+-
+-        map.moveCamera(CameraUpdateFactory.newLatLngZoom(sydney, 13));
+-        map.addMarker( new MarkerOptions()
+-                .title(title)
+-                .snippet(address)
+-                .position(sydney));
+-    }
+-}
